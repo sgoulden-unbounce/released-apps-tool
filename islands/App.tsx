@@ -12,7 +12,8 @@ import AppManifestsContext, {
   initialContext,
 } from "../components/AppManifestsContext.tsx";
 import { Table } from "../components/Table.tsx";
-import { tw } from "../utils/twind.ts";
+import { tw } from "@twind";
+import LoadingSpinner from "../components/LoadingSpinner.tsx";
 
 type AppToReleaseMapping = {
   [appName: string]: { [releasedLocation: string]: boolean };
@@ -39,34 +40,37 @@ const manifestsToTableData = (
 
 export default function App() {
   const [appManifests, setAppsManifests] = useState<AppManifests>({});
+  const [errors, setErrors] = useState("");
   const [jwt, setJwt] = useState("");
-  useEffect(() => {
-    const setManifests = async () => {
-      const integration = await fetch("/get_manifests/integration", {
-        headers: { authorization: `Bearer ${jwt}` },
-      });
-      const production = await fetch("/get_manifests/production", {
-        headers: { authorization: `Bearer ${jwt}` },
-      });
-      const unbouncers = await fetch("/get_manifests/unbouncers", {
-        headers: { authorization: `Bearer ${jwt}` },
-      });
-      const reviewers = await fetch("/get_manifests/reviewers", {
-        headers: { authorization: `Bearer ${jwt}` },
-      });
-      const integrationJson = await integration.json();
-      const productionJson = await production.json();
-      const unbouncersJson = await unbouncers.json();
-      const reviewersJson = await reviewers.json();
-      setAppsManifests({
-        integration: integrationJson,
-        production: productionJson,
-        reviewers: reviewersJson,
-        unbouncers: unbouncersJson,
-      });
-    };
-    if (jwt && jwt !== "") setManifests();
-  }, [jwt]);
+  const [loading, setLoading] = useState(false);
+  const getManifests = async () => {
+    if (jwt !== "") {
+      try {
+        const responses = await Promise
+          .all(
+            releasedLocations
+              .map((location) =>
+                fetch(`/manifests/${location}`, {
+                  headers: { authorization: `Bearer ${jwt}` },
+                })
+              ),
+          );
+        const [integrationJson, productionJson, unbouncersJson, reviewersJson] =
+          await Promise.all(responses.map((location) => location.json()));
+
+        setAppsManifests({
+          integration: integrationJson,
+          production: productionJson,
+          reviewers: reviewersJson,
+          unbouncers: unbouncersJson,
+        });
+      } catch (error) {
+        setErrors(error.message);
+      }
+    } else {
+      setErrors("Please enter your JWT!");
+    }
+  };
 
   const appToReleaseMapping: AppToReleaseMapping = {};
   releasedLocations.forEach((location) =>
@@ -77,15 +81,86 @@ export default function App() {
       [app_name, { integration, reviewers, unbouncers, production }],
     ) => [app_name, integration, reviewers, unbouncers, production],
   );
+
+  const updateManifests = async () => {
+    setErrors("");
+    setLoading(true);
+    const promises = ["integration", "production"]
+      .map((location) =>
+        fetch(`/manifests/${location}`, {
+          method: "post",
+          headers: {
+            authorization: `Bearer ${jwt}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            value: JSON.stringify(appManifests[location]),
+            "created_by": "Sam Goulden",
+            selector: "channels:stable",
+          }),
+        })
+      );
+    promises.push(
+      fetch(`/manifests/unbouncers`, {
+        method: "post",
+        headers: {
+          authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          value: JSON.stringify(appManifests.unbouncers),
+          "created_by": "Sam Goulden",
+          selector: "channels:unbouncers",
+        }),
+      }),
+    );
+    promises.push(
+      fetch(`/manifests/reviewers`, {
+        method: "post",
+        headers: {
+          authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          value: JSON.stringify(appManifests.reviewers),
+          "created_by": "Sam Goulden",
+          selector: "channels:sb-app-testing",
+        }),
+      }),
+    );
+    const responses = await Promise.all(promises);
+    const [integrationJson, productionJson, unbouncersJson, reviewersJson] =
+      await Promise.all(responses.map((location) => location.json()));
+    setAppsManifests({
+      integration: integrationJson,
+      reviewers: reviewersJson,
+      unbouncers: unbouncersJson,
+      production: productionJson,
+    });
+    setLoading(false);
+  };
   return (
     <AppManifestsContext.Provider value={{ appManifests, setAppsManifests }}>
+      <div>{errors}</div>
       <label for="jwt-input">Input your JWT here</label>
-      <input
-        class={tw`border`}
-        aria-label="jwt-input"
-        onBlur={(e) =>
-          setJwt(e?.target?.value)}
-      />
+      <div class={tw`flex space-x-20`}>
+        <input
+          class={tw`border`}
+          aria-label="jwt-input"
+          onBlur={(e) =>
+            setJwt(e?.target?.value)}
+        />
+        <button
+          class={tw`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded`}
+          onClick={rows.length > 0 ? updateManifests : getManifests}
+        >
+          {rows.length > 0
+            ? loading
+              ? <LoadingSpinner />
+              : "Commit Changes to LIVE Smart Builder app"
+            : "Load Released apps"}
+        </button>
+      </div>
       <Table
         columns={[
           "App Name",

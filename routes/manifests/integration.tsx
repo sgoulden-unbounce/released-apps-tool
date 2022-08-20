@@ -14,4 +14,19 @@ export const handler: Handlers = {
     }
     return resp;
   },
+  async POST(req) {
+    const resp = await fetch(
+      "https://api.unbounce.com/ensign/integration/flags/content-creation-editor/config/appManifests",
+      {
+        method: "PUT",
+        headers: req.headers,
+        body: req.body,
+      },
+    );
+    if (resp.status === 200) {
+      const { flag: { value } } = await resp.json();
+      return new Response(value);
+    }
+    return resp;
+  },
 };
