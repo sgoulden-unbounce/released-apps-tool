@@ -1,3 +1,11 @@
-# react-ge6fvi-hwrkma
+# fresh project
 
-[Edit on StackBlitz ⚡️](https://stackblitz.com/edit/react-ge6fvi-hwrkma)
+### Usage
+
+Start the project:
+
+```
+deno task start
+```
+
+This will watch the project directory and restart as necessary.

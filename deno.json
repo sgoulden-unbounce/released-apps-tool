@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "start": "deno run -A --watch=static/,routes/ dev.ts",
+    "npm:add": "deno run -A https://esm.sh/v91 add",
+    "npm:update": "deno run -A https://esm.sh/v91 update",
+    "npm:remove": "deno run -A https://esm.sh/v91 remove"
+  },
+  "importMap": "./import_map.json"
+}
