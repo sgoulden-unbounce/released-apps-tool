@@ -27,13 +27,14 @@ export const convertManifestToAppName = (manifestString: string) => {
 const manifestsToTableData = (
   startObject: AppToReleaseMapping,
   manifest: string[],
-  releaseLocation: string,
+  releaseLocation: string
 ) => {
   const manifestNames = manifest?.map(
-    (app_name) => (startObject[app_name] = {
-      ...(startObject[app_name] || {}),
-      [releaseLocation]: true,
-    }),
+    (app_name) =>
+      (startObject[app_name] = {
+        ...(startObject[app_name] || {}),
+        [releaseLocation]: true,
+      })
   );
   return manifestNames;
 };
@@ -46,15 +47,13 @@ export default function App() {
   const getManifests = async () => {
     if (jwt !== "") {
       try {
-        const responses = await Promise
-          .all(
-            releasedLocations
-              .map((location) =>
-                fetch(`/manifests/${location}`, {
-                  headers: { authorization: `Bearer ${jwt}` },
-                })
-              ),
-          );
+        const responses = await Promise.all(
+          releasedLocations.map((location) =>
+            fetch(`/manifests/${location}`, {
+              headers: { authorization: `Bearer ${jwt}` },
+            })
+          )
+        );
         const [integrationJson, productionJson, unbouncersJson, reviewersJson] =
           await Promise.all(responses.map((location) => location.json()));
 
@@ -77,29 +76,39 @@ export default function App() {
     manifestsToTableData(appToReleaseMapping, appManifests[location], location)
   );
   const rows = Object.entries(appToReleaseMapping).map(
-    (
-      [app_name, { integration, reviewers, unbouncers, production }],
-    ) => [app_name, integration, reviewers, unbouncers, production],
+    ([app_name, { integration, reviewers, unbouncers, production }]) => [
+      app_name,
+      integration,
+      reviewers,
+      unbouncers,
+      production,
+    ]
   );
 
   const updateManifests = async () => {
+    if (
+      !window.confirm(
+        "Are you sure? This will affect live Smart Builder code. Ensure you have double checked the correct apps have been released"
+      )
+    ) {
+      return;
+    }
     setErrors("");
     setLoading(true);
-    const promises = ["integration", "production"]
-      .map((location) =>
-        fetch(`/manifests/${location}`, {
-          method: "post",
-          headers: {
-            authorization: `Bearer ${jwt}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            value: JSON.stringify(appManifests[location]),
-            "created_by": "Sam Goulden",
-            selector: "channels:stable",
-          }),
-        })
-      );
+    const promises = ["integration", "production"].map((location) =>
+      fetch(`/manifests/${location}`, {
+        method: "post",
+        headers: {
+          authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          value: JSON.stringify(appManifests[location]),
+          created_by: "Sam Goulden",
+          selector: "channels:stable",
+        }),
+      })
+    );
     promises.push(
       fetch(`/manifests/unbouncers`, {
         method: "post",
@@ -109,10 +118,10 @@ export default function App() {
         },
         body: JSON.stringify({
           value: JSON.stringify(appManifests.unbouncers),
-          "created_by": "Sam Goulden",
+          created_by: "Sam Goulden",
           selector: "channels:unbouncers",
         }),
-      }),
+      })
     );
     promises.push(
       fetch(`/manifests/reviewers`, {
@@ -123,10 +132,10 @@ export default function App() {
         },
         body: JSON.stringify({
           value: JSON.stringify(appManifests.reviewers),
-          "created_by": "Sam Goulden",
+          created_by: "Sam Goulden",
           selector: "channels:sb-app-testing",
         }),
-      }),
+      })
     );
     const responses = await Promise.all(promises);
     const [integrationJson, productionJson, unbouncersJson, reviewersJson] =
@@ -147,18 +156,21 @@ export default function App() {
         <input
           class={tw`border`}
           aria-label="jwt-input"
-          onBlur={(e) =>
-            setJwt(e?.target?.value)}
+          onBlur={(e) => setJwt(e?.target?.value)}
         />
         <button
           class={tw`bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded`}
           onClick={rows.length > 0 ? updateManifests : getManifests}
         >
-          {rows.length > 0
-            ? loading
-              ? <LoadingSpinner />
-              : "Commit Changes to LIVE Smart Builder app"
-            : "Load Released apps"}
+          {rows.length > 0 ? (
+            loading ? (
+              <LoadingSpinner />
+            ) : (
+              "Commit Changes to LIVE Smart Builder app"
+            )
+          ) : (
+            "Load Released apps"
+          )}
         </button>
       </div>
       <Table
